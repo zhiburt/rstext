@@ -1,0 +1,5 @@
+msgid "greeting"
+msgstr "Hello World"
+
+msgid "timeline"
+msgstr "2020-07-02"
