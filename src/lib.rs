@@ -22,25 +22,35 @@ impl Locale {
         })
     }
 
-    pub fn domain<S: AsRef<str>>(&mut self, name: S) -> Result<DomainLocaled> {
-        let locale = self.locale.clone();
+    pub fn load<S: AsRef<str>>(&mut self, name: S) -> Result<()> {
+        let locale = &self.locale;
+        self.translator.load(name.as_ref())?;
         self.translator
-            .domain(name)
-            .and_then(|d| Ok(DomainLocaled { d, locale }))
+            .domain_mut(name.as_ref())
+            .unwrap()
+            .load(locale)
+    }
+
+    pub fn domain<S: AsRef<str>>(&self, name: S) -> Option<DomainLocaled> {
+        self.translator.domains.get(name.as_ref()).and_then(|d| {
+            Some(DomainLocaled {
+                d,
+                locale: &self.locale,
+            })
+        })
     }
 }
 
 pub struct DomainLocaled<'a> {
-    d: &'a mut Domain,
-    locale: String,
+    d: &'a Domain,
+    locale: &'a str,
 }
 
 impl DomainLocaled<'_> {
-    pub fn get<S: AsRef<str>>(&mut self, id: S) -> Result<Option<&str>> {
+    pub fn get<S: AsRef<str>>(&mut self, id: S) -> Option<&str> {
         self.d
-            .locale(&self.locale)?
-            .get(id.as_ref())
-            .map_or(Ok(None), |v| Ok(Some(v)))
+            .locale(self.locale)
+            .and_then(|po| po.get(id.as_ref()))
     }
 }
 
@@ -57,12 +67,9 @@ impl Translator {
         })
     }
 
-    pub fn domain<S: AsRef<str>>(&mut self, name: S) -> Result<&mut Domain> {
-        if self.domains.contains_key(name.as_ref()) {
-            return Ok(self.domains.get_mut(name.as_ref()).unwrap());
-        }
-
-        let path = self.path.join(name.as_ref());
+    pub fn load<S: AsRef<str>>(&mut self, name: S) -> Result<()> {
+        let name = name.as_ref();
+        let path = self.path.join(name);
         match std::fs::metadata(&path) {
             Err(io) => return Err(TextError::from(io)),
             Ok(metadata) if metadata.is_file() => return Err(TextError::DomainNotFound),
@@ -70,14 +77,29 @@ impl Translator {
         };
 
         self.domains.insert(
-            name.as_ref().to_owned(),
+            name.to_owned(),
             Domain {
                 path,
                 locales: HashMap::new(),
             },
         );
+        Ok(())
+    }
 
-        Ok(self.domains.get_mut(name.as_ref()).unwrap())
+    pub fn load_and_get<S: AsRef<str>>(&mut self, domain: S) -> Result<&mut Domain> {
+        self.load(domain.as_ref())?;
+        match self.domain_mut(domain.as_ref()) {
+            Some(domain) => Ok(domain),
+            None => unreachable!(),
+        }
+    }
+
+    pub fn domain<S: AsRef<str>>(&self, name: S) -> Option<&Domain> {
+        self.domains.get(name.as_ref())
+    }
+
+    pub fn domain_mut<S: AsRef<str>>(&mut self, name: S) -> Option<&mut Domain> {
+        self.domains.get_mut(name.as_ref())
     }
 }
 
@@ -87,22 +109,20 @@ pub struct Domain {
 }
 
 impl Domain {
-    pub fn locale<S: AsRef<str>>(&mut self, locale: S) -> Result<&po::Po> {
+    pub fn locale<S: AsRef<str>>(&self, locale: S) -> Option<&po::Po> {
         // @todo: resolve down casting of locale if it's not exists
         // ru_KZ -> ru
+        self.locales.get(locale.as_ref())
+    }
+
+    pub fn load<S: AsRef<str>>(&mut self, locale: S) -> Result<()> {
         let locale = locale.as_ref();
-
-        if self.locales.contains_key(locale) {
-            return Ok(&self.locales[locale]);
-        }
-
         let path = self.path.join(locale.to_owned() + ".po");
         let file = std::fs::File::open(&path)?;
 
         let file = po::Po::parse(file)?;
 
         self.locales.insert(locale.to_owned(), file);
-
-        Ok(&self.locales[locale])
+        Ok(())
     }
 }
