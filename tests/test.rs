@@ -25,6 +25,14 @@ fn default_locale() {
 }
 
 #[test]
+fn locale_simplification() {
+    let mut locale = rstext::Locale::new("example_locales", "en_UK").unwrap();
+    let domain = locale.load("domain1").unwrap();
+    assert_eq!(domain.get("greeting"), Some("Hello World"));
+    assert_eq!(domain.get("timeline"), Some("2020-07-02"));
+}
+
+#[test]
 fn locale_getd() {
     let mut locale = rstext::Locale::new("example_locales", "en").unwrap();
     locale.load("domain1").unwrap();

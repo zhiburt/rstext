@@ -116,19 +116,29 @@ pub struct Domain {
 
 impl Domain {
     pub fn locale<S: AsRef<str>>(&self, locale: S) -> Option<&po::Po> {
-        // @todo: resolve down casting of locale if it's not exists
-        // ru_KZ -> ru
-        self.locales.get(locale.as_ref())
+        let locale = locale.as_ref();
+        self.locales.get(locale).or_else(|| {
+            if locale.len() > 2 {
+                self.locales.get(&locale[..2])
+            } else {
+                None
+            }
+        })
     }
 
     pub fn load<S: AsRef<str>>(&mut self, locale: S) -> Result<()> {
         let locale = locale.as_ref();
         let path = self.path.join(locale.to_owned() + ".po");
-        let file = std::fs::File::open(&path)?;
-
-        let file = po::Po::parse(file)?;
-
-        self.locales.insert(locale.to_owned(), file);
-        Ok(())
+        match std::fs::File::open(&path) {
+            Ok(file) => {
+                let file = po::Po::parse(file)?;
+                self.locales.insert(locale.to_owned(), file);
+                Ok(())
+            }
+            // @todo: might better to save it as initial locale [..] not as simplified [..2]
+            // in this case Domain::locale function would be reduced with the check 
+            Err(..) if locale.len() > 2 => self.load(&locale[..2]),
+            Err(err) => Err(TextError::from(err)),
+        }
     }
 }
