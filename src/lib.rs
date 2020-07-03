@@ -17,12 +17,12 @@ impl Locale {
         let locale = locale.as_ref();
         let path = dir.as_ref().join(locale);
         match std::fs::metadata(&path) {
-            Ok(metadata) if metadata.is_file() => Err(TextError::LocaleNotFound),
-            Err(..) if locale.len() > 2 => Self::new(dir, &locale[..2]),
-            _ => Ok(Self {
+            Ok(metadata) if metadata.is_dir() => Ok(Self {
                 path,
                 domains: HashMap::new(),
             }),
+            Err(..) if locale.len() > 2 => Self::new(dir, &locale[..2]),
+            _ => Err(TextError::LocaleNotFound),
         }
     }
 

@@ -1,11 +1,17 @@
 use rstext;
 
 #[test]
-fn default_locale() {
+fn locale() {
     let mut locale = rstext::Locale::new("example_locales", "en").unwrap();
     let domain = locale.load("index").unwrap();
     assert_eq!(domain.get("greeting"), Some("Hello World"));
     assert_eq!(domain.get("timeline"), Some("2020-07-02"));
+}
+
+#[test]
+fn locale_not_found() {
+    let locale = rstext::Locale::new("example_locales", "bl");
+    assert!(locale.is_err());
 }
 
 #[test]
@@ -15,6 +21,12 @@ fn locale_simplification() {
     let domain = locale.load("index").unwrap();
     assert_eq!(domain.get("greeting"), Some("Hello World"));
     assert_eq!(domain.get("timeline"), Some("2020-07-02"));
+}
+
+#[test]
+fn locale_simplification_not_found() {
+    let locale = rstext::Locale::new("example_locales", "bl_00");
+    assert!(locale.is_err());
 }
 
 #[test]
