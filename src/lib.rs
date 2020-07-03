@@ -32,12 +32,17 @@ impl Locale {
     }
 
     pub fn domain<S: AsRef<str>>(&self, name: S) -> Option<DomainLocaled> {
-        self.translator.domains.get(name.as_ref()).and_then(|d| {
+        self.translator.domain(name.as_ref()).and_then(|d| {
             Some(DomainLocaled {
                 d,
                 locale: &self.locale,
             })
         })
+    }
+
+    pub fn getd<S: AsRef<str>, S2: AsRef<str>>(&self, domain: S, id: S2) -> Option<String> {
+        self.domain(domain)
+            .and_then(|d| d.get(id.as_ref()).map(|s| s.to_owned()))
     }
 }
 
@@ -47,7 +52,7 @@ pub struct DomainLocaled<'a> {
 }
 
 impl DomainLocaled<'_> {
-    pub fn get<S: AsRef<str>>(&mut self, id: S) -> Option<&str> {
+    pub fn get<S: AsRef<str>>(&self, id: S) -> Option<&str> {
         self.d
             .locale(self.locale)
             .and_then(|po| po.get(id.as_ref()))
