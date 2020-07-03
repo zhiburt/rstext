@@ -22,7 +22,7 @@ impl Po {
         let mut state = State::None;
         loop {
             line.clear();
-            let eof = reader.read_line(&mut line).unwrap();
+            let eof = reader.read_line(&mut line)?;
             if eof == 0 {
                 match state {
                     State::Msgid(..) => return Err(TextError::FormatError),
@@ -34,7 +34,10 @@ impl Po {
                 }
                 break;
             }
-            if line.is_empty() || line.trim().is_empty() {
+
+            let is_empty_line = line.is_empty() || line.trim().is_empty();
+            let is_comment = line.starts_with("#");
+            if is_empty_line || is_comment {
                 continue;
             }
 
@@ -114,6 +117,19 @@ mod tests {
         let file = r#"
 msgid "ask_location_menu.next_button"
     
+msgstr "Next""#;
+        let po = Po::parse(file.as_bytes()).unwrap();
+        assert_eq!(po.get("ask_location_menu.next_button"), Some("Next"));
+    }
+
+    #[test]
+    fn parse_po_file_comments() {
+        let file = r#"
+#  translator-comments
+#. extracted-comments
+#: reference…
+#, flag…
+msgid "ask_location_menu.next_button"
 msgstr "Next""#;
         let po = Po::parse(file.as_bytes()).unwrap();
         assert_eq!(po.get("ask_location_menu.next_button"), Some("Next"));
