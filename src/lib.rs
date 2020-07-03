@@ -42,4 +42,8 @@ impl Locale {
     pub fn getd<S: AsRef<str>, S2: AsRef<str>>(&self, domain: S, id: S2) -> Option<&str> {
         self.domain(domain).and_then(|d| d.get(id.as_ref()))
     }
+
+    pub fn code(&self) -> &std::ffi::OsStr {
+        self.path.file_name().unwrap()
+    }
 }
