@@ -22,13 +22,14 @@ impl Locale {
         })
     }
 
-    pub fn load<S: AsRef<str>>(&mut self, name: S) -> Result<()> {
+    pub fn load<S: AsRef<str>>(&mut self, name: S) -> Result<DomainLocaled> {
         let locale = &self.locale;
         self.translator.load(name.as_ref())?;
         self.translator
             .domain_mut(name.as_ref())
             .unwrap()
-            .load(locale)
+            .load(locale)?;
+        Ok(self.domain(name.as_ref()).unwrap())
     }
 
     pub fn domain<S: AsRef<str>>(&self, name: S) -> Option<DomainLocaled> {

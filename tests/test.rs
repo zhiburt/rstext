@@ -19,8 +19,7 @@ fn default() {
 #[test]
 fn default_locale() {
     let mut locale = rstext::Locale::new("example_locales", "en").unwrap();
-    locale.load("domain1").unwrap();
-    let domain = locale.domain("domain1").unwrap();
+    let domain = locale.load("domain1").unwrap();
     assert_eq!(domain.get("greeting"), Some("Hello World"));
     assert_eq!(domain.get("timeline"), Some("2020-07-02"));
 }
