@@ -1,5 +1,9 @@
 msgid "greeting"
 msgstr "Hello World"
 
+msgctxt "menu"
+msgid "timeline"
+msgstr "2020-07-02"
+
 msgid "timeline"
 msgstr "2020-07-02"

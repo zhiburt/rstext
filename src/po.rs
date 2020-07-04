@@ -4,19 +4,31 @@ use std::io::{BufRead, Read};
 
 #[derive(Default)]
 pub struct Po {
-    entities: HashMap<String, String>,
+    entities: Entities,
+    contexts: HashMap<String, Entities>,
 }
+
+type Entities = HashMap<String, String>;
 
 impl Po {
     pub fn parse<R: Read>(reader: R) -> Result<Self> {
         let mut reader = std::io::BufReader::new(reader);
         let mut entities = HashMap::new();
+        let mut contexts: HashMap<String, Entities> = HashMap::new();
         let mut line = String::new();
 
         enum State {
             None,
-            Msgid(String),
-            Entity { msgid: String, msgstr: String },
+            Context(String),
+            Msgid {
+                id: String,
+                ctx: Option<String>,
+            },
+            Entity {
+                msgid: String,
+                msgstr: String,
+                ctx: Option<String>,
+            },
         }
 
         let mut state = State::None;
@@ -25,10 +37,15 @@ impl Po {
             let eof = reader.read_line(&mut line)?;
             if eof == 0 {
                 match state {
-                    State::Msgid(..) => return Err(TextError::FormatError),
-                    State::Entity { msgid, msgstr } => {
-                        entities.insert(msgid, msgstr);
-                    }
+                    State::Msgid { .. } | State::Context(..) => return Err(TextError::FormatError),
+                    State::Entity { msgid, msgstr, ctx } => match ctx {
+                        Some(ctx) => {
+                            contexts.entry(ctx).or_default().insert(msgid, msgstr);
+                        }
+                        None => {
+                            entities.insert(msgid, msgstr);
+                        }
+                    },
                     // eof
                     _ => (),
                 }
@@ -41,27 +58,64 @@ impl Po {
                 continue;
             }
 
-            if line.starts_with("msgid") {
+            if line.starts_with("msgctxt") {
                 // state is changed save privious entity
                 // we can't save state emidiately after creating in order to suppot multi lines
-                if let State::Entity { msgid, msgstr } = state {
-                    entities.insert(msgid, msgstr);
+                if let State::Entity { msgid, msgstr, ctx } = state {
+                    match ctx {
+                        Some(ctx) => {
+                            contexts.entry(ctx).or_default().insert(msgid, msgstr);
+                        }
+                        None => {
+                            entities.insert(msgid, msgstr);
+                        }
+                    }
                 }
 
+                let s: &str = line[7..].trim();
+                let context = unqoute(s).map(|s| s.to_owned())?;
+
+                state = State::Context(context);
+                continue;
+            }
+
+            if line.starts_with("msgid") {
                 let s: &str = line[5..].trim();
                 let id = unqoute(s).map(|s| s.to_owned())?;
 
-                state = State::Msgid(id);
+                // @todo: clean up
+                match state {
+                    // state is changed save privious entity
+                    // we can't save state emidiately after creating in order to suppot multi lines
+                    State::Entity { msgid, msgstr, ctx } => match ctx {
+                        Some(ctx) => {
+                            contexts.entry(ctx).or_default().insert(msgid, msgstr);
+                            state = State::Msgid { id, ctx: None };
+                        }
+                        None => {
+                            entities.insert(msgid, msgstr);
+                            state = State::Msgid { id, ctx: None };
+                        }
+                    },
+                    State::Context(ctx) => {
+                        state = State::Msgid { id, ctx: Some(ctx) };
+                    }
+                    _ => {
+                        state = State::Msgid { id, ctx: None };
+                    }
+                }
+
                 continue;
             }
 
             match state {
-                State::Msgid(msgid) if line.starts_with("msgstr") => {
+                State::Msgid { id, ctx } if line.starts_with("msgstr") => {
                     let s: &str = line[6..].trim();
                     let msgstr = unqoute(s).map(|s| s.to_owned())?;
 
                     state = State::Entity {
-                        msgid: msgid.clone(),
+                        msgid: id.clone(),
+                        ctx,
                         msgstr,
                     };
                     continue;
@@ -76,11 +130,18 @@ impl Po {
             }
         }
 
-        Ok(Self { entities })
+        Ok(Self { entities, contexts })
     }
 
     pub fn get(&self, id: &str) -> Option<&str> {
         self.entities.get(id).and_then(|s| Some(s.as_str()))
+    }
+
+    pub fn getc(&self, context: &str, id: &str) -> Option<&str> {
+        self.contexts
+            .get(context)
+            .and_then(|entities| entities.get(id))
+            .and_then(|s| Some(s.as_str()))
     }
 }
 
@@ -170,5 +231,15 @@ msgstr "Next""#;
                           \"3\"\n";
         let po = Po::parse(file.as_bytes()).unwrap();
         assert_eq!(po.get("id"), Some("123"));
+    }
+
+    #[test]
+    fn parse_po_file_context() {
+        let file = "msgctxt \"default\"\n\
+                          msgid \"id\"\n\
+                          msgstr \"1\"\n";
+        let po = Po::parse(file.as_bytes()).unwrap();
+        assert_eq!(po.getc("default", "id"), Some("1"));
+        assert_eq!(po.get("id"), None);
     }
 }
