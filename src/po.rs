@@ -4,6 +4,7 @@ use std::io::{BufRead, Read};
 
 #[derive(Default)]
 pub struct Po {
+    header: Option<HashMap<String, String>>,
     entities: Entities,
     contexts: HashMap<String, Entities>,
 }
@@ -122,7 +123,8 @@ impl Po {
                 }
                 // handle multiline entity
                 State::Entity { ref mut msgstr, .. } if unqoute(line.trim()).is_ok() => {
-                    msgstr.push_str(unqoute(line.trim()).unwrap());
+                    let s = unqoute(line.trim()).unwrap();
+                    msgstr.push_str(&s);
                     continue;
                 }
                 // format error
@@ -130,7 +132,13 @@ impl Po {
             }
         }
 
-        Ok(Self { entities, contexts })
+        let header = entities.get("").and_then(|s| Some(parse_header(s)));
+
+        Ok(Self {
+            entities,
+            contexts,
+            header,
+        })
     }
 
     pub fn get(&self, id: &str) -> Option<&str> {
@@ -143,6 +151,23 @@ impl Po {
             .and_then(|entities| entities.get(id))
             .and_then(|s| Some(s.as_str()))
     }
+
+    pub fn header(&self) -> Option<&HashMap<String, String>> {
+        self.header.as_ref()
+    }
+}
+
+fn parse_header(s: &str) -> HashMap<String, String> {
+    // @todo: there's a problem with saving strings with escape sequences
+    // that's why here `\\n`
+    s.split("\\n")
+        .map(|line| {
+            line.find(":")
+                .and_then(|pos| Some((&line[..pos], &line[pos + 1..])))
+        })
+        .flatten()
+        .map(|(key, value)| (key.to_owned(), value.to_owned()))
+        .collect()
 }
 
 fn unqoute<'a>(s: &'a str) -> Result<&'a str> {

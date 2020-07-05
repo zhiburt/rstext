@@ -34,7 +34,7 @@ fn locale_getd() {
     let mut locale = rstext::Locale::new("example_locales", "en").unwrap();
     locale.load("index").unwrap();
     assert_eq!(locale.getd("index", "greeting"), Some("Hello World"));
-    assert_eq!(locale.getd("index", ""), None);
+    assert_eq!(locale.getd("index", "not_exists"), None);
 }
 
 #[test]
@@ -42,4 +42,17 @@ fn locale_get_message_from_context() {
     let mut locale = rstext::Locale::new("example_locales", "en").unwrap();
     let domain = locale.load("index").unwrap();
     assert_eq!(domain.getc("menu", "timeline"), Some("2020-07-02"));
+}
+
+#[test]
+fn header() {
+    let mut locale = rstext::Locale::new("example_locales", "en").unwrap();
+    let domain = locale.load("index").unwrap();
+    assert!(domain.header().is_some());
+    assert_eq!(
+        domain
+            .header()
+            .and_then(|h| h.get("Project").map(|s| s.as_str())),
+        Some(" rstext")
+    );
 }
