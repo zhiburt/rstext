@@ -1,4 +1,7 @@
+[![Crate](https://img.shields.io/crates/v/rstext)](https://crates.io/crates/rstext)
+
 # rstext
+
 Rust [GNU gettext](http://www.gnu.org/software/gettext/) utilities crate.
 Inspired by [gotext](https://github.com/leonelquinteros/gotext) library.
 
